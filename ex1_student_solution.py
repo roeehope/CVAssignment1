@@ -54,7 +54,7 @@ class Solution:
             homographyRow1[7] = -(y*yPrime)
             homographyRow1[8] = -yPrime
 
-            return [homographyRow,homographyRow1]
+            return   [homographyRow,homographyRow1]
             
         rows = []    
         for pointX,pointY,xPrimeDst,yPrimeDst in zip(match_p_src[0],match_p_src[1],match_p_dst[0],match_p_dst[1]):

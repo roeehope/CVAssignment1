@@ -67,7 +67,7 @@ def main():
     plt.figure()
     forward_panorama_slow_plot = plt.imshow(transformed_image)
     plt.title('Forward Homography Slow implementation')
-    # plt.show()
+    plt.show()
 
     # Plot naive homography with forward mapping, fast implementation
     tt = time.time()

@@ -99,7 +99,37 @@ class Solution:
         # return new_image
         """INSERT YOUR CODE HERE"""
 
+        '''
+        print(src_image.reshape(-1))
+        print(src_image[0][0])
+        '''
+        print(dst_image_shape)
+        dst_image = np.zeros(dst_image_shape)
 
+        
+        for i in range(len(src_image[:])):
+            for j in range(len(src_image[i][:])):
+                new_pixel = np.matmul(homography,np.array([j,i,1]))
+
+                dstY = round(new_pixel[0]/new_pixel[2])
+                dstX = round(new_pixel[1]/new_pixel[2])
+                
+                if dstX > 0 and dstX < dst_image_shape[0] and dstY > 0 and dstY < dst_image_shape[1]:
+                    dst_image[dstX][dstY]=src_image[i][j]/255
+                    #print(src_image[i][j])
+                #print(str(i)," ",str(j)," pixel color: ", src_image[i][j])
+
+        
+        '''
+        for i in range(600,800):
+            for j in range(800,1000):
+                    print("adding")
+                    dst_image[i][j]=dst_image[51][163]
+        '''
+
+
+        return dst_image
+        
         pass
 
     @staticmethod

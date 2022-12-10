@@ -33,7 +33,20 @@ class Solution:
         """
         # return homography
         """INSERT YOUR CODE HERE"""
+
         def RowsFromPoint(x,y, xPrime, yPrime):
+            """
+            this function recieves the coordinates of a 
+            matching point in the source image, (x,y),
+            and in the destination image, (xPrime,yPrime),
+            and outputs the coefficents of the two equations
+            derived from the point as two numpy arrays of length 9.
+
+            after computing this function for all matching points,
+            the resulting arrays can be stacked vertically to get a 
+            2Nx9 matrix that can be used to find the homography
+            using a SVD decomposition.
+            """
             homographyRow = np.ones(9)
             homographyRow[0] = x
             homographyRow[1] = y
@@ -58,15 +71,11 @@ class Solution:
             
         rows = []    
         for pointX,pointY,xPrimeDst,yPrimeDst in zip(match_p_src[0],match_p_src[1],match_p_dst[0],match_p_dst[1]):
-            rows = rows + RowsFromPoint(pointX,pointY,xPrime=xPrimeDst,yPrime=yPrimeDst)
+            rows += RowsFromPoint(pointX,pointY,xPrime=xPrimeDst,yPrime=yPrimeDst)
             
         
         eqMat = np.vstack(rows)
         u,sigma,v = np.linalg.svd(eqMat)
-        #print(v[8])
-        
-
-
         
         return v[8].reshape(3,3)
         
@@ -161,6 +170,41 @@ class Solution:
         """
         # return new_image
         """INSERT YOUR CODE HERE"""
+
+        dst_image = np.zeros(dst_image_shape) # destination image matrix
+
+        src_image_shape = src_image.shape
+        print(src_image_shape)
+        x_axis_coordinates = np.arange(src_image_shape[1])
+        y_axis_coordinates = np.arange(src_image_shape[0])
+        x_coords,y_coords = np.meshgrid(x_axis_coordinates,y_axis_coordinates)
+        # both x_coords and y_coords are of shape(height,width), we reshape them
+        x_coords,y_coords = x_coords.flatten(),y_coords.flatten()
+        
+        # now generate 3x(height*width) source coordinates matrix
+        source_coordinates = np.vstack([x_coords,y_coords,np.ones_like(x_coords)])
+        
+        # multiply by homography to get destination coordinates, and then normalize by dividing
+        # the first two rows by the third
+        dest_coordinates = np.matmul(homography,source_coordinates)
+        dest_non_homogeneous_coordinates = (dest_coordinates[:-1]/dest_coordinates[2]).round().astype(int)
+
+        # boolean 1D array for column selection
+        clipped_coordinates_mask = \
+            np.all(dest_non_homogeneous_coordinates >= 0,axis=0) & \
+            np.all(np.less(dest_non_homogeneous_coordinates,np.array([[dst_image_shape[1]],[dst_image_shape[0]]])),axis=0)
+        # keep only pixels that are transformed inside the bounds of the dest image
+        clipped_dst_coordinates = dest_non_homogeneous_coordinates[:,clipped_coordinates_mask]
+        clipped_src_coordinates = source_coordinates[:-1][:,clipped_coordinates_mask]
+
+        print(clipped_src_coordinates)
+        #transform pixels into dst_image from src_image
+        data = src_image[clipped_src_coordinates[1],clipped_src_coordinates[0],:]
+        print(data.shape)
+        dst_image[clipped_dst_coordinates[1],clipped_dst_coordinates[0],:] = data
+        print(dst_image.shape,dst_image.max(),dst_image.min(),dst_image.mean())
+        return dst_image
+
         pass
 
     @staticmethod

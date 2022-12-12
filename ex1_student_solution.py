@@ -112,7 +112,7 @@ class Solution:
         print(src_image.reshape(-1))
         print(src_image[0][0])
         '''
-        print(dst_image_shape)
+        #print(dst_image_shape)
         dst_image = np.zeros(dst_image_shape)
 
         
@@ -174,7 +174,7 @@ class Solution:
         dst_image = np.zeros(dst_image_shape) # destination image matrix
 
         src_image_shape = src_image.shape
-        print(src_image_shape)
+        #print(src_image_shape)
         x_axis_coordinates = np.arange(src_image_shape[1])
         y_axis_coordinates = np.arange(src_image_shape[0])
         x_coords,y_coords = np.meshgrid(x_axis_coordinates,y_axis_coordinates)
@@ -197,12 +197,12 @@ class Solution:
         clipped_dst_coordinates = dest_non_homogeneous_coordinates[:,clipped_coordinates_mask]
         clipped_src_coordinates = source_coordinates[:-1][:,clipped_coordinates_mask]
 
-        print(clipped_src_coordinates)
+        #print(clipped_src_coordinates)
         #transform pixels into dst_image from src_image
         data = src_image[clipped_src_coordinates[1],clipped_src_coordinates[0],:]
-        print(data.shape)
+        #print(data.shape)
         dst_image[clipped_dst_coordinates[1],clipped_dst_coordinates[0],:] = data/255
-        print(dst_image.shape,dst_image.max(),dst_image.min(),dst_image.mean())
+        #print(dst_image.shape,dst_image.max(),dst_image.min(),dst_image.mean())
         return dst_image
 
         pass
@@ -242,28 +242,28 @@ class Solution:
         perfect_match_y = []
         perfect_match_dstX = []
         perfect_match_dstY = []
-        print(max_err)
+        #print(max_err)
 
         for x,y,dstX,dstY in zip(match_p_src[0],match_p_src[1],match_p_dst[0],match_p_dst[1]):
             new_pixel = np.matmul(homography,np.array([x,y,1]))
-            
+
             true_new_pixel = [round(new_pixel[0]/new_pixel[2]),round(new_pixel[1]/new_pixel[2])]
-            print(HammiltonDistance(dstX,dstY,true_new_pixel[0],true_new_pixel[1]))
+            #print(HammiltonDistance(dstX,dstY,true_new_pixel[0],true_new_pixel[1]))
 
             if HammiltonDistance(dstX,dstY,true_new_pixel[0],true_new_pixel[1]) <= max_err:
                 perfect_match_x += [true_new_pixel[0]]
                 perfect_match_y += [true_new_pixel[1]]
                 perfect_match_dstX += [dstX]
                 perfect_match_dstY += [dstY]
-                print("point" + str(x) +" " + str(y))
+                #print("point" + str(x) +" " + str(y))
 
         if len(perfect_match_dstX) == 0:
-            return (10**9,0)
+            return (0,10**9)
 
         distance = []
         for x,y,dstX,dstY in zip(perfect_match_x,perfect_match_y,perfect_match_dstX,perfect_match_dstY):
             distance += [HammiltonDistance(x,y,dstX,dstY)]
-        print(distance)
+        #print(distance)
 
         mse = np.square(distance).mean()
         return (len(perfect_match_dstX)/len(match_p_src[0]),mse)
@@ -297,6 +297,22 @@ class Solution:
         """
         # return mp_src_meets_model, mp_dst_meets_model
         """INSERT YOUR CODE HERE"""
+
+
+        # transform src points to dst points:
+        homogeneous_src_coords = np.vstack([match_p_src,np.ones_like(match_p_src[0,:])])
+        transformed_homogeneous_coords = np.matmul(homography,homogeneous_src_coords)
+        final_dst_coords = (transformed_homogeneous_coords[:-1]/transformed_homogeneous_coords[2]).round().astype(int)
+
+        # Note: we use Hamming distance as our distance function
+        distances = np.abs(match_p_dst - final_dst_coords).sum(axis=0)
+        meets = distances <= max_err
+
+        mp_src_meets_model = match_p_src[:,meets]
+        mp_dst_meets_model = match_p_dst[:,meets]
+
+
+        return mp_src_meets_model, mp_dst_meets_model
         pass
 
     def compute_homography(self,
@@ -318,19 +334,40 @@ class Solution:
             homography: Projective transformation matrix from src to dst.
         """
         # # use class notations:
-        # w = inliers_percent
-        # # t = max_err
+        w = inliers_percent
+        t = max_err
         # # p = parameter determining the probability of the algorithm to
         # # succeed
-        # p = 0.99
+        p = 0.99
         # # the minimal probability of points which meets with the model
-        # d = 0.5
+        d = 0.5
         # # number of points sufficient to compute the model
-        # n = 4
+        n = 4
         # # number of RANSAC iterations (+1 to avoid the case where w=1)
-        # k = int(np.ceil(np.log(1 - p) / np.log(1 - w ** n))) + 1
+        k = int(np.ceil(np.log(1 - p) / np.log(1 - w ** n))) + 1
         # return homography
         """INSERT YOUR CODE HERE"""
+
+
+        iterations = 0
+        bestFit = np.zeros((3,3))
+        bestErr = 10**9
+
+        for i in range(k):
+            indecies= np.random.choice(match_p_src.shape[1], 4,  replace=False)
+            
+            calc_matrix = Solution.compute_homography_naive(match_p_src[:,indecies],match_p_dst[:,indecies])
+            mat_percentage ,matrix_err = Solution.test_homography(calc_matrix,match_p_src,match_p_dst,max_err)
+            if mat_percentage > d:
+                srcInliers, dstInliers = Solution.meet_the_model_points(calc_matrix,match_p_src,match_p_dst,t)
+                calc_matrix = Solution.compute_homography_naive(srcInliers,dstInliers)
+                mat_percentage ,matrix_err = Solution.test_homography(calc_matrix,match_p_src,match_p_dst,max_err)
+                if matrix_err < bestErr:
+                    bestErr = matrix_err
+                    bestFit = calc_matrix
+
+        return bestFit
+
         pass
 
     @staticmethod

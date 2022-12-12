@@ -490,6 +490,11 @@ class Solution:
         """
         # return final_homography
         """INSERT YOUR CODE HERE"""
+
+        translation_matrix = np.vstack([[1,0,-pad_left],[0,1,-pad_up],[0,0,1]])
+        composed_matrix = np.matmul(translation_matrix,backward_homography)
+
+        return composed_matrix*composed_matrix[3][3]
         pass
 
     def panorama(self,

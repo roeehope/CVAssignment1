@@ -201,7 +201,7 @@ class Solution:
         #transform pixels into dst_image from src_image
         data = src_image[clipped_src_coordinates[1],clipped_src_coordinates[0],:]
         print(data.shape)
-        dst_image[clipped_dst_coordinates[1],clipped_dst_coordinates[0],:] = data
+        dst_image[clipped_dst_coordinates[1],clipped_dst_coordinates[0],:] = data/255
         print(dst_image.shape,dst_image.max(),dst_image.min(),dst_image.mean())
         return dst_image
 
@@ -234,6 +234,40 @@ class Solution:
         """
         # return fit_percent, dist_mse
         """INSERT YOUR CODE HERE"""
+
+        def HammiltonDistance(x,y,xPrime,yPrime):
+            return abs(x-xPrime) + abs(y-yPrime)
+
+        perfect_match_x = []
+        perfect_match_y = []
+        perfect_match_dstX = []
+        perfect_match_dstY = []
+        print(max_err)
+
+        for x,y,dstX,dstY in zip(match_p_src[0],match_p_src[1],match_p_dst[0],match_p_dst[1]):
+            new_pixel = np.matmul(homography,np.array([x,y,1]))
+            
+            true_new_pixel = [round(new_pixel[0]/new_pixel[2]),round(new_pixel[1]/new_pixel[2])]
+            print(HammiltonDistance(dstX,dstY,true_new_pixel[0],true_new_pixel[1]))
+
+            if HammiltonDistance(dstX,dstY,true_new_pixel[0],true_new_pixel[1]) <= max_err:
+                perfect_match_x += [true_new_pixel[0]]
+                perfect_match_y += [true_new_pixel[1]]
+                perfect_match_dstX += [dstX]
+                perfect_match_dstY += [dstY]
+                print("point" + str(x) +" " + str(y))
+
+        if len(perfect_match_dstX) == 0:
+            return (10**9,0)
+
+        distance = []
+        for x,y,dstX,dstY in zip(perfect_match_x,perfect_match_y,perfect_match_dstX,perfect_match_dstY):
+            distance += [HammiltonDistance(x,y,dstX,dstY)]
+        print(distance)
+
+        mse = np.square(distance).mean()
+        return (len(perfect_match_dstX)/len(match_p_src[0]),mse)
+
         pass
 
     @staticmethod

@@ -5,6 +5,7 @@ from typing import Tuple
 from random import sample
 from collections import namedtuple
 
+import matplotlib.pyplot as plt
 
 from numpy.linalg import svd
 from scipy.interpolate import griddata
@@ -398,6 +399,55 @@ class Solution:
 
         # return backward_warp
         """INSERT YOUR CODE HERE"""
+        
+        # generate pixel coordinates of destination image
+        dst_meshgrid_x,dst_meshgrid_y = np.meshgrid(np.arange(dst_image_shape[1]),np.arange(dst_image_shape[0]))
+
+        dst_pixel_coordinates_homogeneous = np.vstack([dst_meshgrid_x.flatten(),dst_meshgrid_y.flatten(),
+            np.ones(dst_image_shape[1]*dst_image_shape[0])])
+        print("dst_pixel_coordinates_homogeneous",dst_pixel_coordinates_homogeneous)
+        src_points_coordinates_homogeneous = np.matmul(backward_projective_homography,dst_pixel_coordinates_homogeneous)
+
+        # points on the source image plane that need to be sampled using linear interpolation
+        src_points_coordinates = (src_points_coordinates_homogeneous[:-1]/src_points_coordinates_homogeneous[2])
+        print("src_points_coordinates",src_points_coordinates)
+
+        src_image_shape = src_image.shape
+        src_meshgrid_x,src_meshgrid_y = np.meshgrid(np.arange(src_image_shape[1]),np.arange(src_image_shape[0]))
+        src_pixel_coordinates = np.vstack([src_meshgrid_x.flatten(),src_meshgrid_y.flatten()])
+        src_pixel_coordinates_transposed = src_pixel_coordinates.transpose()
+        # need to interpolate every color channel separatly
+        print("src_points_coordinates",src_pixel_coordinates)
+
+        dst_shape_2d = (dst_image_shape[0],dst_image_shape[1])
+
+        print("interpolating red")
+        red_values = griddata(src_pixel_coordinates_transposed,
+            src_image[src_pixel_coordinates[1],src_pixel_coordinates[0],0],
+            (src_points_coordinates[0].reshape(dst_shape_2d),src_points_coordinates[1].reshape(dst_shape_2d)),
+            method='linear',fill_value = 15)
+        print("interpolating green")
+        green_values = griddata(src_pixel_coordinates_transposed,
+            src_image[src_pixel_coordinates[1],src_pixel_coordinates[0],1],
+            (src_points_coordinates[0].reshape(dst_shape_2d),src_points_coordinates[1].reshape(dst_shape_2d)),
+            method='linear',fill_value = 15)
+        print("interpolating blue")
+        blue_values = griddata(src_pixel_coordinates_transposed,
+            src_image[src_pixel_coordinates[1],src_pixel_coordinates[0],2],
+            (src_points_coordinates[0].reshape(dst_shape_2d),src_points_coordinates[1].reshape(dst_shape_2d)),
+            method='linear',fill_value = 15)
+        print(blue_values.max(),red_values.max(),green_values.max())
+        interpolated_image = np.dstack([red_values,green_values,blue_values])
+
+        print(interpolated_image.mean())
+        print(interpolated_image.max())
+
+        #backward_warp = np.zeros(dst_image_shape)
+        
+        #backward_warp[src_pixel_coordinates[1],src_pixel_coordinates[0],:] = interpolated_image[src_pixel_coordinates[1],src_pixel_coordinates[0],:]
+
+        return interpolated_image
+
         pass
 
     @staticmethod
@@ -490,6 +540,16 @@ class Solution:
         """
         # return final_homography
         """INSERT YOUR CODE HERE"""
+
+        translation = np.array([
+            [1,0,-pad_left],
+            [0,1,-pad_up],
+            [0,0,1]
+        ])
+
+        final_homography = np.matmul(backward_homography,translation)
+        return final_homography
+
         pass
 
     def panorama(self,
@@ -533,4 +593,49 @@ class Solution:
         """
         # return np.clip(img_panorama, 0, 255).astype(np.uint8)
         """INSERT YOUR CODE HERE"""
+
+        forward_homography = self.compute_homography(
+                                    match_p_src,
+                                    match_p_dst,
+                                    inliers_percent,
+                                    max_err)
+        height,width,pads = Solution.find_panorama_shape(src_image,dst_image,forward_homography)    
+
+        final_panorama = np.zeros((height,width,3))
+    
+        backward_homography = self.compute_homography(
+                                    match_p_dst,
+                                    match_p_src,
+                                    inliers_percent,
+                                    max_err)
+
+        translated_backwards_homography = Solution.add_translation_to_backward_homography(
+            backward_homography,pads.pad_left,pads.pad_up)
+        
+        # creates an image of the src matrix warped into the dst image
+        src_warp = Solution.compute_backward_mapping(translated_backwards_homography,src_image,final_panorama.shape)
+
+        print(src_warp)
+        print(src_warp.shape)
+        print(src_warp.mean())
+        print(src_warp.max())
+
+        plt.figure()
+        pplot = plt.imshow(src_warp/255)
+        plt.title('WARPED')
+        # plt.show()
+        plt.show()
+
+
+        # copy destination image into final panorama
+        dst_image_shape = dst_image.shape
+        final_panorama[pads.pad_up:pads.pad_up + dst_image_shape[0],pads.pad_left:pads.pad_left + dst_image_shape[1],:] = dst_image
+
+        # copy warped src image into final panorama 
+        src_warp[pads.pad_up:pads.pad_up + dst_image_shape[0],pads.pad_left:pads.pad_left + dst_image_shape[1],:] = 0
+        final_panorama += src_warp
+        
+        return final_panorama/255
+
+
         pass
